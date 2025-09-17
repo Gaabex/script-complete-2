@@ -1319,3 +1319,44 @@ player.CharacterAdded:Connect(function(character)
     
     if flyEnabled then
         toggleFly()
+    end
+end)
+
+-- Configuração inicial
+if player.Character then
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        originalWalkSpeed = humanoid.WalkSpeed
+        originalJumpPower = humanoid.JumpPower
+    end
+end
+
+-- Sistema de pulo infinito global
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJumpEnabled then
+        local character = player.Character
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+wait(1)
+print("🚀 PAINEL DE HABILIDADES PRO CARREGADO!")
+print("📝 CONTROLES:")
+print("   G - Abrir/Fechar Painel")
+print("   N - Toggle Noclip")
+print("   J - Toggle Pulo Infinito") 
+print("   V - Toggle ESP")
+print("   B - Toggle Aim Assist")
+print("   H - Toggle Fly")
+print("   C - Toggle Cooldown Modifier")
+print("   F - Teleporte (padrão)")
+
+-- Criar GUI automaticamente
+spawn(function()
+    wait(2)
+    if not isGuiOpen then
+        toggleGui()
+    end
+end)
