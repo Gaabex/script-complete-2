@@ -1,4 +1,4 @@
--- Painel de Habilidades para Roblox - VERSÃO COMPLETA
+-- Painel de Habilidades para Roblox - VERSÃO COM COOLDOWN
 -- Coloque este script em StarterPlayer > StarterPlayerScripts
 -- Pressione G para abrir/fechar o painel
 
@@ -25,7 +25,7 @@ print("✅ PlayerGui encontrado!")
 -- Variáveis de controle
 local isGuiOpen = false
 local teleportEnabled = false
-local damageMultiplierEnabled = false
+local cooldownModifierEnabled = false
 local speedEnabled = false
 local noclipEnabled = false
 local infiniteJumpEnabled = false
@@ -33,7 +33,6 @@ local espEnabled = false
 local aimAssistEnabled = false
 local flyEnabled = false
 local teleportKey = "F"
-local currentMultiplier = 2
 local currentSpeed = 50
 local originalWalkSpeed = 16
 local originalJumpPower = 50
@@ -45,8 +44,9 @@ local noclipConnection = nil
 local flyConnection = nil
 local espBoxes = {}
 local hookedRemotes = {}
-local damageConnections = {}
+local cooldownConnections = {}
 local flySpeed = 50
+local cooldownMultiplier = 0.5 -- 0.5 = metade do cooldown, 0.1 = 10% do cooldown original
 
 -- Função para criar efeito visual de teleporte
 local function createTeleportEffect(position)
@@ -349,10 +349,13 @@ local function toggleAimAssist()
     end
 end
 
--- Sistema de multiplicador de dano (melhorado)
-local function setupDamageMultiplier()
-    damageConnections = {}
+-- Sistema de modificador de cooldown (NOVO)
+local originalCooldowns = {}
+
+local function setupCooldownModifier()
+    cooldownConnections = {}
     hookedRemotes = {}
+    originalCooldowns = {}
     
     local character = player.Character
     if not character then return end
@@ -360,7 +363,16 @@ local function setupDamageMultiplier()
     local function hookTool(tool)
         if not tool:IsA("Tool") then return end
         
+        -- Hook para LocalScripts que controlam cooldown
         for _, descendant in pairs(tool:GetDescendants()) do
+            if descendant:IsA("LocalScript") then
+                local source = descendant.Source
+                if string.find(string.lower(source), "cooldown") or string.find(string.lower(source), "wait") then
+                    print("🕒 Detectado script com cooldown em: " .. tool.Name)
+                end
+            end
+            
+            -- Hook para RemoteEvents e RemoteFunctions
             if descendant:IsA("RemoteEvent") then
                 if not hookedRemotes[descendant] then
                     hookedRemotes[descendant] = descendant.FireServer
@@ -368,10 +380,13 @@ local function setupDamageMultiplier()
                     descendant.FireServer = function(self, ...)
                         local args = {...}
                         
+                        -- Tentar interceptar argumentos de cooldown
                         for i, arg in pairs(args) do
-                            if type(arg) == "number" and arg > 0 and arg < 1000 then
-                                args[i] = arg * currentMultiplier
-                                print("💥 Dano multiplicado: " .. arg .. " -> " .. args[i])
+                            if type(arg) == "number" and arg > 0.1 and arg < 60 then
+                                -- Provavelmente um tempo de cooldown
+                                local newCooldown = arg * cooldownMultiplier
+                                args[i] = newCooldown
+                                print("⏱️ Cooldown modificado: " .. arg .. "s -> " .. newCooldown .. "s")
                                 break
                             end
                         end
@@ -379,6 +394,28 @@ local function setupDamageMultiplier()
                         return hookedRemotes[descendant](self, unpack(args))
                     end
                 end
+            end
+        end
+        
+        -- Hook para NumberValues que podem representar cooldown
+        for _, descendant in pairs(tool:GetDescendants()) do
+            if descendant:IsA("NumberValue") and (string.find(string.lower(descendant.Name), "cooldown") or 
+                string.find(string.lower(descendant.Name), "delay") or string.find(string.lower(descendant.Name), "wait")) then
+                
+                if not originalCooldowns[descendant] then
+                    originalCooldowns[descendant] = descendant.Value
+                end
+                
+                descendant.Value = originalCooldowns[descendant] * cooldownMultiplier
+                print("🔧 Cooldown Value modificado: " .. descendant.Name .. " -> " .. descendant.Value)
+                
+                -- Monitorar mudanças
+                table.insert(cooldownConnections, descendant.Changed:Connect(function(newValue)
+                    if newValue ~= originalCooldowns[descendant] * cooldownMultiplier then
+                        wait(0.1)
+                        descendant.Value = originalCooldowns[descendant] * cooldownMultiplier
+                    end
+                end))
             end
         end
     end
@@ -396,12 +433,46 @@ local function setupDamageMultiplier()
     end
     
     -- Hook futuras ferramentas
-    table.insert(damageConnections, character.ChildAdded:Connect(hookTool))
+    table.insert(cooldownConnections, character.ChildAdded:Connect(hookTool))
     if backpack then
-        table.insert(damageConnections, backpack.ChildAdded:Connect(hookTool))
+        table.insert(cooldownConnections, backpack.ChildAdded:Connect(hookTool))
     end
     
-    print("✅ Sistema de multiplicador configurado!")
+    -- Tentar modificar cooldowns globais conhecidos
+    local function modifyGlobalCooldowns()
+        local commonCooldownNames = {"Cooldown", "AttackCooldown", "SkillCooldown", "AbilityCooldown", "Delay"}
+        
+        for _, name in pairs(commonCooldownNames) do
+            local foundValues = {}
+            
+            -- Procurar em ReplicatedStorage
+            if game:GetService("ReplicatedStorage"):FindFirstChild(name, true) then
+                local value = game:GetService("ReplicatedStorage"):FindFirstChild(name, true)
+                if value:IsA("NumberValue") then
+                    table.insert(foundValues, value)
+                end
+            end
+            
+            -- Procurar em StarterGui
+            if game:GetService("StarterGui"):FindFirstChild(name, true) then
+                local value = game:GetService("StarterGui"):FindFirstChild(name, true)
+                if value:IsA("NumberValue") then
+                    table.insert(foundValues, value)
+                end
+            end
+            
+            for _, value in pairs(foundValues) do
+                if not originalCooldowns[value] then
+                    originalCooldowns[value] = value.Value
+                end
+                value.Value = originalCooldowns[value] * cooldownMultiplier
+                print("🌐 Cooldown global modificado: " .. value.Name)
+            end
+        end
+    end
+    
+    modifyGlobalCooldowns()
+    print("✅ Sistema de modificador de cooldown configurado!")
 end
 
 -- Funções para atualizar status visual
@@ -419,9 +490,10 @@ local function updateTeleportStatus(statusLabel, button)
     end
 end
 
-local function updateDamageStatus(statusLabel, button)
-    if damageMultiplierEnabled then
-        statusLabel.Text = "STATUS: ATIVO (" .. currentMultiplier .. "x)"
+local function updateCooldownStatus(statusLabel, button)
+    if cooldownModifierEnabled then
+        local percent = math.floor(cooldownMultiplier * 100)
+        statusLabel.Text = "STATUS: ATIVO (" .. percent .. "%)"
         statusLabel.TextColor3 = Color3.new(0, 1, 0)
         button.BackgroundColor3 = Color3.new(0, 0.7, 0)
         button.Text = "DESATIVAR"
@@ -545,7 +617,7 @@ local function setupCustomKey(keyLabel)
     end)
 end
 
--- Função para criar a GUI (expandida)
+-- Função para criar a GUI (atualizada)
 local function createGui()
     print("🎨 Criando interface expandida...")
     
@@ -559,7 +631,7 @@ local function createGui()
     gui.Parent = playerGui
     gui.ResetOnSpawn = false
     
-    -- Frame principal (maior para acomodar mais seções)
+    -- Frame principal
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 420, 0, 700)
@@ -628,7 +700,7 @@ local function createGui()
         return section
     end
     
-    -- Criar todas as seções
+    -- Criar todas as seções (substituindo dano por cooldown)
     local teleportSection = createSection("Teleporte", "🚀", 5, 160)
     local speedSection = createSection("Velocidade", "💨", 175, 140)
     local noclipSection = createSection("Noclip", "👻", 325, 100)
@@ -636,632 +708,10 @@ local function createGui()
     local espSection = createSection("ESP", "👁️", 545, 100)
     local aimSection = createSection("Aim Assist", "🎯", 655, 100)
     local flySection = createSection("Fly", "✈️", 765, 140)
-    local damageSection = createSection("Multiplicador de Dano", "⚔️", 915, 140)
+    local cooldownSection = createSection("Modificador de Cooldown", "⏱️", 915, 140)
     
-    -- Configurar seção de teleporte (mesmo código anterior)
+    -- Configurar seção de teleporte
     local teleportStatus = Instance.new("TextLabel")
     teleportStatus.Size = UDim2.new(1, -10, 0, 20)
     teleportStatus.Position = UDim2.new(0, 5, 0, 30)
-    teleportStatus.BackgroundTransparency = 1
-    teleportStatus.Text = "STATUS: DESATIVADO"
-    teleportStatus.TextColor3 = Color3.new(1, 0, 0)
-    teleportStatus.TextScaled = true
-    teleportStatus.Font = Enum.Font.Gotham
-    teleportStatus.Parent = teleportSection
-    
-    local teleportToggle = Instance.new("TextButton")
-    teleportToggle.Size = UDim2.new(0.45, 0, 0, 35)
-    teleportToggle.Position = UDim2.new(0.05, 0, 0, 55)
-    teleportToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    teleportToggle.BorderSizePixel = 0
-    teleportToggle.Text = "ATIVAR"
-    teleportToggle.TextColor3 = Color3.new(1, 1, 1)
-    teleportToggle.TextScaled = true
-    teleportToggle.Font = Enum.Font.GothamBold
-    teleportToggle.Parent = teleportSection
-    
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
-    toggleCorner.Parent = teleportToggle
-    
-    local teleportNow = Instance.new("TextButton")
-    teleportNow.Size = UDim2.new(0.45, 0, 0, 35)
-    teleportNow.Position = UDim2.new(0.5, 0, 0, 55)
-    teleportNow.BackgroundColor3 = Color3.new(0, 0.5, 0.8)
-    teleportNow.BorderSizePixel = 0
-    teleportNow.Text = "TELEPORTAR AGORA"
-    teleportNow.TextColor3 = Color3.new(1, 1, 1)
-    teleportNow.TextScaled = true
-    teleportNow.Font = Enum.Font.GothamBold
-    teleportNow.Parent = teleportSection
-    
-    local nowCorner = Instance.new("UICorner")
-    nowCorner.CornerRadius = UDim.new(0, 8)
-    nowCorner.Parent = teleportNow
-    
-    local keyLabel = Instance.new("TextLabel")
-    keyLabel.Size = UDim2.new(1, -10, 0, 20)
-    keyLabel.Position = UDim2.new(0, 5, 0, 95)
-    keyLabel.BackgroundTransparency = 1
-    keyLabel.Text = "TECLA: " .. teleportKey
-    keyLabel.TextColor3 = Color3.new(1, 1, 1)
-    keyLabel.TextScaled = true
-    keyLabel.Font = Enum.Font.Gotham
-    keyLabel.Parent = teleportSection
-    
-    local chooseKey = Instance.new("TextButton")
-    chooseKey.Size = UDim2.new(1, -10, 0, 30)
-    chooseKey.Position = UDim2.new(0, 5, 0, 120)
-    chooseKey.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    chooseKey.BorderSizePixel = 0
-    chooseKey.Text = "ESCOLHER NOVA TECLA"
-    chooseKey.TextColor3 = Color3.new(1, 1, 1)
-    chooseKey.TextScaled = true
-    chooseKey.Font = Enum.Font.Gotham
-    chooseKey.Parent = teleportSection
-    
-    local chooseCorner = Instance.new("UICorner")
-    chooseCorner.CornerRadius = UDim.new(0, 8)
-    chooseCorner.Parent = chooseKey
-    
-    -- Configurar seção de velocidade
-    local speedStatus = Instance.new("TextLabel")
-    speedStatus.Size = UDim2.new(1, -10, 0, 20)
-    speedStatus.Position = UDim2.new(0, 5, 0, 30)
-    speedStatus.BackgroundTransparency = 1
-    speedStatus.Text = "STATUS: DESATIVADO"
-    speedStatus.TextColor3 = Color3.new(1, 0, 0)
-    speedStatus.TextScaled = true
-    speedStatus.Font = Enum.Font.Gotham
-    speedStatus.Parent = speedSection
-    
-    local speedToggle = Instance.new("TextButton")
-    speedToggle.Size = UDim2.new(0.45, 0, 0, 35)
-    speedToggle.Position = UDim2.new(0.05, 0, 0, 55)
-    speedToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    speedToggle.BorderSizePixel = 0
-    speedToggle.Text = "ATIVAR"
-    speedToggle.TextColor3 = Color3.new(1, 1, 1)
-    speedToggle.TextScaled = true
-    speedToggle.Font = Enum.Font.GothamBold
-    speedToggle.Parent = speedSection
-    
-    local speedToggleCorner = Instance.new("UICorner")
-    speedToggleCorner.CornerRadius = UDim.new(0, 8)
-    speedToggleCorner.Parent = speedToggle
-    
-    local speedBox = Instance.new("TextBox")
-    speedBox.Size = UDim2.new(0.45, 0, 0, 35)
-    speedBox.Position = UDim2.new(0.5, 0, 0, 55)
-    speedBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    speedBox.BorderSizePixel = 0
-    speedBox.Text = "50"
-    speedBox.PlaceholderText = "Velocidade"
-    speedBox.TextColor3 = Color3.new(1, 1, 1)
-    speedBox.TextScaled = true
-    speedBox.Font = Enum.Font.Gotham
-    speedBox.Parent = speedSection
-    
-    local speedBoxCorner = Instance.new("UICorner")
-    speedBoxCorner.CornerRadius = UDim.new(0, 8)
-    speedBoxCorner.Parent = speedBox
-    
-    local speedExplanation = Instance.new("TextLabel")
-    speedExplanation.Size = UDim2.new(1, -10, 0, 35)
-    speedExplanation.Position = UDim2.new(0, 5, 0, 95)
-    speedExplanation.BackgroundTransparency = 1
-    speedExplanation.Text = "Normal: 16 | Recomendado: 30-80"
-    speedExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    speedExplanation.TextScaled = true
-    speedExplanation.Font = Enum.Font.Gotham
-    speedExplanation.Parent = speedSection
-    
-    -- Configurar seção de noclip
-    local noclipStatus = Instance.new("TextLabel")
-    noclipStatus.Size = UDim2.new(1, -10, 0, 20)
-    noclipStatus.Position = UDim2.new(0, 5, 0, 30)
-    noclipStatus.BackgroundTransparency = 1
-    noclipStatus.Text = "STATUS: DESATIVADO"
-    noclipStatus.TextColor3 = Color3.new(1, 0, 0)
-    noclipStatus.TextScaled = true
-    noclipStatus.Font = Enum.Font.Gotham
-    noclipStatus.Parent = noclipSection
-    
-    local noclipToggle = Instance.new("TextButton")
-    noclipToggle.Size = UDim2.new(0.8, 0, 0, 40)
-    noclipToggle.Position = UDim2.new(0.1, 0, 0, 50)
-    noclipToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    noclipToggle.BorderSizePixel = 0
-    noclipToggle.Text = "ATIVAR"
-    noclipToggle.TextColor3 = Color3.new(1, 1, 1)
-    noclipToggle.TextScaled = true
-    noclipToggle.Font = Enum.Font.GothamBold
-    noclipToggle.Parent = noclipSection
-    
-    local noclipCorner = Instance.new("UICorner")
-    noclipCorner.CornerRadius = UDim.new(0, 8)
-    noclipCorner.Parent = noclipToggle
-    
-    -- Configurar seção de pulo infinito
-    local jumpStatus = Instance.new("TextLabel")
-    jumpStatus.Size = UDim2.new(1, -10, 0, 20)
-    jumpStatus.Position = UDim2.new(0, 5, 0, 30)
-    jumpStatus.BackgroundTransparency = 1
-    jumpStatus.Text = "STATUS: DESATIVADO"
-    jumpStatus.TextColor3 = Color3.new(1, 0, 0)
-    jumpStatus.TextScaled = true
-    jumpStatus.Font = Enum.Font.Gotham
-    jumpStatus.Parent = jumpSection
-    
-    local jumpToggle = Instance.new("TextButton")
-    jumpToggle.Size = UDim2.new(0.8, 0, 0, 40)
-    jumpToggle.Position = UDim2.new(0.1, 0, 0, 50)
-    jumpToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    jumpToggle.BorderSizePixel = 0
-    jumpToggle.Text = "ATIVAR"
-    jumpToggle.TextColor3 = Color3.new(1, 1, 1)
-    jumpToggle.TextScaled = true
-    jumpToggle.Font = Enum.Font.GothamBold
-    jumpToggle.Parent = jumpSection
-    
-    local jumpCorner = Instance.new("UICorner")
-    jumpCorner.CornerRadius = UDim.new(0, 8)
-    jumpCorner.Parent = jumpToggle
-    
-    -- Configurar seção de ESP
-    local espStatus = Instance.new("TextLabel")
-    espStatus.Size = UDim2.new(1, -10, 0, 20)
-    espStatus.Position = UDim2.new(0, 5, 0, 30)
-    espStatus.BackgroundTransparency = 1
-    espStatus.Text = "STATUS: DESATIVADO"
-    espStatus.TextColor3 = Color3.new(1, 0, 0)
-    espStatus.TextScaled = true
-    espStatus.Font = Enum.Font.Gotham
-    espStatus.Parent = espSection
-    
-    local espToggle = Instance.new("TextButton")
-    espToggle.Size = UDim2.new(0.8, 0, 0, 40)
-    espToggle.Position = UDim2.new(0.1, 0, 0, 50)
-    espToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    espToggle.BorderSizePixel = 0
-    espToggle.Text = "ATIVAR"
-    espToggle.TextColor3 = Color3.new(1, 1, 1)
-    espToggle.TextScaled = true
-    espToggle.Font = Enum.Font.GothamBold
-    espToggle.Parent = espSection
-    
-    local espCorner = Instance.new("UICorner")
-    espCorner.CornerRadius = UDim.new(0, 8)
-    espCorner.Parent = espToggle
-    
-    -- Configurar seção de aim assist
-    local aimStatus = Instance.new("TextLabel")
-    aimStatus.Size = UDim2.new(1, -10, 0, 20)
-    aimStatus.Position = UDim2.new(0, 5, 0, 30)
-    aimStatus.BackgroundTransparency = 1
-    aimStatus.Text = "STATUS: DESATIVADO"
-    aimStatus.TextColor3 = Color3.new(1, 0, 0)
-    aimStatus.TextScaled = true
-    aimStatus.Font = Enum.Font.Gotham
-    aimStatus.Parent = aimSection
-    
-    local aimToggle = Instance.new("TextButton")
-    aimToggle.Size = UDim2.new(0.8, 0, 0, 40)
-    aimToggle.Position = UDim2.new(0.1, 0, 0, 50)
-    aimToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    aimToggle.BorderSizePixel = 0
-    aimToggle.Text = "ATIVAR"
-    aimToggle.TextColor3 = Color3.new(1, 1, 1)
-    aimToggle.TextScaled = true
-    aimToggle.Font = Enum.Font.GothamBold
-    aimToggle.Parent = aimSection
-    
-    local aimCorner = Instance.new("UICorner")
-    aimCorner.CornerRadius = UDim.new(0, 8)
-    aimCorner.Parent = aimToggle
-    
-    -- Configurar seção de fly
-    local flyStatus = Instance.new("TextLabel")
-    flyStatus.Size = UDim2.new(1, -10, 0, 20)
-    flyStatus.Position = UDim2.new(0, 5, 0, 30)
-    flyStatus.BackgroundTransparency = 1
-    flyStatus.Text = "STATUS: DESATIVADO"
-    flyStatus.TextColor3 = Color3.new(1, 0, 0)
-    flyStatus.TextScaled = true
-    flyStatus.Font = Enum.Font.Gotham
-    flyStatus.Parent = flySection
-    
-    local flyToggle = Instance.new("TextButton")
-    flyToggle.Size = UDim2.new(0.45, 0, 0, 35)
-    flyToggle.Position = UDim2.new(0.05, 0, 0, 55)
-    flyToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    flyToggle.BorderSizePixel = 0
-    flyToggle.Text = "ATIVAR"
-    flyToggle.TextColor3 = Color3.new(1, 1, 1)
-    flyToggle.TextScaled = true
-    flyToggle.Font = Enum.Font.GothamBold
-    flyToggle.Parent = flySection
-    
-    local flyToggleCorner = Instance.new("UICorner")
-    flyToggleCorner.CornerRadius = UDim.new(0, 8)
-    flyToggleCorner.Parent = flyToggle
-    
-    local flyBox = Instance.new("TextBox")
-    flyBox.Size = UDim2.new(0.45, 0, 0, 35)
-    flyBox.Position = UDim2.new(0.5, 0, 0, 55)
-    flyBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    flyBox.BorderSizePixel = 0
-    flyBox.Text = "50"
-    flyBox.PlaceholderText = "Velocidade"
-    flyBox.TextColor3 = Color3.new(1, 1, 1)
-    flyBox.TextScaled = true
-    flyBox.Font = Enum.Font.Gotham
-    flyBox.Parent = flySection
-    
-    local flyBoxCorner = Instance.new("UICorner")
-    flyBoxCorner.CornerRadius = UDim.new(0, 8)
-    flyBoxCorner.Parent = flyBox
-    
-    local flyExplanation = Instance.new("TextLabel")
-    flyExplanation.Size = UDim2.new(1, -10, 0, 35)
-    flyExplanation.Position = UDim2.new(0, 5, 0, 95)
-    flyExplanation.BackgroundTransparency = 1
-    flyExplanation.Text = "Use WASD + Space/Shift para voar"
-    flyExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    flyExplanation.TextScaled = true
-    flyExplanation.Font = Enum.Font.Gotham
-    flyExplanation.Parent = flySection
-    
-    -- Configurar seção de multiplicador de dano
-    local damageStatus = Instance.new("TextLabel")
-    damageStatus.Size = UDim2.new(1, -10, 0, 20)
-    damageStatus.Position = UDim2.new(0, 5, 0, 30)
-    damageStatus.BackgroundTransparency = 1
-    damageStatus.Text = "STATUS: DESATIVADO"
-    damageStatus.TextColor3 = Color3.new(1, 0, 0)
-    damageStatus.TextScaled = true
-    damageStatus.Font = Enum.Font.Gotham
-    damageStatus.Parent = damageSection
-    
-    local damageToggle = Instance.new("TextButton")
-    damageToggle.Size = UDim2.new(0.45, 0, 0, 35)
-    damageToggle.Position = UDim2.new(0.05, 0, 0, 55)
-    damageToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    damageToggle.BorderSizePixel = 0
-    damageToggle.Text = "ATIVAR"
-    damageToggle.TextColor3 = Color3.new(1, 1, 1)
-    damageToggle.TextScaled = true
-    damageToggle.Font = Enum.Font.GothamBold
-    damageToggle.Parent = damageSection
-    
-    local damageToggleCorner = Instance.new("UICorner")
-    damageToggleCorner.CornerRadius = UDim.new(0, 8)
-    damageToggleCorner.Parent = damageToggle
-    
-    local multiplierBox = Instance.new("TextBox")
-    multiplierBox.Size = UDim2.new(0.45, 0, 0, 35)
-    multiplierBox.Position = UDim2.new(0.5, 0, 0, 55)
-    multiplierBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    multiplierBox.BorderSizePixel = 0
-    multiplierBox.Text = "2"
-    multiplierBox.PlaceholderText = "Multiplicador"
-    multiplierBox.TextColor3 = Color3.new(1, 1, 1)
-    multiplierBox.TextScaled = true
-    multiplierBox.Font = Enum.Font.Gotham
-    multiplierBox.Parent = damageSection
-    
-    local boxCorner = Instance.new("UICorner")
-    boxCorner.CornerRadius = UDim.new(0, 8)
-    boxCorner.Parent = multiplierBox
-    
-    local explanationLabel = Instance.new("TextLabel")
-    explanationLabel.Size = UDim2.new(1, -10, 0, 35)
-    explanationLabel.Position = UDim2.new(0, 5, 0, 95)
-    explanationLabel.BackgroundTransparency = 1
-    explanationLabel.Text = "Funciona com espadas/ferramentas"
-    explanationLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    explanationLabel.TextScaled = true
-    explanationLabel.Font = Enum.Font.Gotham
-    explanationLabel.Parent = damageSection
-    
-    -- Botão fechar
-    local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 25, 0, 25)
-    closeButton.Position = UDim2.new(1, -35, 0, 10)
-    closeButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
-    closeButton.BorderSizePixel = 0
-    closeButton.Text = "X"
-    closeButton.TextColor3 = Color3.new(1, 1, 1)
-    closeButton.TextScaled = true
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.Parent = mainFrame
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 12)
-    closeCorner.Parent = closeButton
-    
-    print("🎛️ Interface completa criada!")
-    
-    -- Eventos dos botões - TELEPORTE
-    teleportToggle.MouseButton1Click:Connect(function()
-        teleportEnabled = not teleportEnabled
-        updateTeleportStatus(teleportStatus, teleportToggle)
-        print("🚀 Teleporte: " .. (teleportEnabled and "ATIVADO" or "DESATIVADO"))
-    end)
-    
-    teleportNow.MouseButton1Click:Connect(function()
-        teleportToMousePosition()
-    end)
-    
-    chooseKey.MouseButton1Click:Connect(function()
-        setupCustomKey(keyLabel)
-    end)
-    
-    -- Eventos dos botões - VELOCIDADE
-    speedToggle.MouseButton1Click:Connect(function()
-        speedEnabled = not speedEnabled
-        updateSpeedStatus(speedStatus, speedToggle)
-        updateSpeed()
-        print("💨 Velocidade: " .. (speedEnabled and "ATIVADA" or "DESATIVADA"))
-    end)
-    
-    speedBox.FocusLost:Connect(function()
-        local value = tonumber(speedBox.Text)
-        if value and value > 0 and value <= 500 then
-            currentSpeed = value
-            updateSpeedStatus(speedStatus, speedToggle)
-            if speedEnabled then
-                updateSpeed()
-            end
-        else
-            speedBox.Text = tostring(currentSpeed)
-        end
-    end)
-    
-    -- Eventos dos botões - NOCLIP
-    noclipToggle.MouseButton1Click:Connect(function()
-        noclipEnabled = not noclipEnabled
-        updateNoclipStatus(noclipStatus, noclipToggle)
-        toggleNoclip()
-    end)
-    
-    -- Eventos dos botões - PULO INFINITO
-    jumpToggle.MouseButton1Click:Connect(function()
-        infiniteJumpEnabled = not infiniteJumpEnabled
-        updateJumpStatus(jumpStatus, jumpToggle)
-        setupInfiniteJump()
-    end)
-    
-    -- Eventos dos botões - ESP
-    espToggle.MouseButton1Click:Connect(function()
-        espEnabled = not espEnabled
-        updateESPStatus(espStatus, espToggle)
-        toggleESP()
-    end)
-    
-    -- Eventos dos botões - AIM ASSIST
-    aimToggle.MouseButton1Click:Connect(function()
-        aimAssistEnabled = not aimAssistEnabled
-        updateAimStatus(aimStatus, aimToggle)
-        toggleAimAssist()
-    end)
-    
-    -- Eventos dos botões - FLY
-    flyToggle.MouseButton1Click:Connect(function()
-        flyEnabled = not flyEnabled
-        updateFlyStatus(flyStatus, flyToggle)
-        toggleFly()
-    end)
-    
-    flyBox.FocusLost:Connect(function()
-        local value = tonumber(flyBox.Text)
-        if value and value > 0 and value <= 200 then
-            flySpeed = value
-            updateFlyStatus(flyStatus, flyToggle)
-        else
-            flyBox.Text = tostring(flySpeed)
-        end
-    end)
-    
-    -- Eventos dos botões - MULTIPLICADOR DE DANO
-    damageToggle.MouseButton1Click:Connect(function()
-        damageMultiplierEnabled = not damageMultiplierEnabled
-        updateDamageStatus(damageStatus, damageToggle)
-        
-        if damageMultiplierEnabled then
-            setupDamageMultiplier()
-        else
-            -- Limpar conexões
-            for _, connection in pairs(damageConnections) do
-                if connection and connection.Disconnect then
-                    connection:Disconnect()
-                end
-            end
-            damageConnections = {}
-            
-            -- Restaurar RemoteEvents
-            for remote, originalFire in pairs(hookedRemotes) do
-                if remote and remote.Parent then
-                    remote.FireServer = originalFire
-                end
-            end
-            hookedRemotes = {}
-        end
-    end)
-    
-    multiplierBox.FocusLost:Connect(function()
-        local value = tonumber(multiplierBox.Text)
-        if value and value > 0 then
-            currentMultiplier = value
-            updateDamageStatus(damageStatus, damageToggle)
-        else
-            multiplierBox.Text = tostring(currentMultiplier)
-        end
-    end)
-    
-    -- Evento do botão fechar
-    closeButton.MouseButton1Click:Connect(function()
-        toggleGui()
-    end)
-    
-    -- Inicializar status
-    updateTeleportStatus(teleportStatus, teleportToggle)
-    updateDamageStatus(damageStatus, damageToggle)
-    updateSpeedStatus(speedStatus, speedToggle)
-    updateNoclipStatus(noclipStatus, noclipToggle)
-    updateJumpStatus(jumpStatus, jumpToggle)
-    updateESPStatus(espStatus, espToggle)
-    updateAimStatus(aimStatus, aimToggle)
-    updateFlyStatus(flyStatus, flyToggle)
-    
-    print("✅ Interface totalmente configurada!")
-    return mainFrame
-end
-
--- Função para abrir/fechar GUI
-function toggleGui()
-    if not gui or not gui.Parent then
-        local newMainFrame = createGui()
-        isGuiOpen = true
-        newMainFrame.Visible = true
-        print("✅ GUI criada e exibida!")
-    else
-        isGuiOpen = not isGuiOpen
-        if mainFrame then
-            mainFrame.Visible = isGuiOpen
-        end
-    end
-end
-
--- Input handling melhorado
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    -- Abrir/fechar painel com G
-    if input.KeyCode == Enum.KeyCode.G then
-        toggleGui()
-    end
-    
-    -- Teleporte com tecla customizada
-    if teleportEnabled then
-        if input.KeyCode.Name == teleportKey then
-            teleportToMousePosition()
-        elseif teleportKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            teleportToMousePosition()
-        elseif teleportKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2 then
-            teleportToMousePosition()
-        end
-    end
-    
-    -- Teclas de atalho adicionais
-    if input.KeyCode == Enum.KeyCode.N then
-        noclipEnabled = not noclipEnabled
-        toggleNoclip()
-        print("👻 Noclip: " .. (noclipEnabled and "ATIVADO" or "DESATIVADO"))
-    end
-    
-    if input.KeyCode == Enum.KeyCode.J then
-        infiniteJumpEnabled = not infiniteJumpEnabled
-        setupInfiniteJump()
-        print("🦘 Pulo Infinito: " .. (infiniteJumpEnabled and "ATIVADO" or "DESATIVADO"))
-    end
-    
-    if input.KeyCode == Enum.KeyCode.V then
-        espEnabled = not espEnabled
-        toggleESP()
-        print("👁️ ESP: " .. (espEnabled and "ATIVADO" or "DESATIVADO"))
-    end
-    
-    if input.KeyCode == Enum.KeyCode.B then
-        aimAssistEnabled = not aimAssistEnabled
-        toggleAimAssist()
-        print("🎯 Aim Assist: " .. (aimAssistEnabled and "ATIVADO" or "DESATIVADO"))
-    end
-    
-    if input.KeyCode == Enum.KeyCode.H then
-        flyEnabled = not flyEnabled
-        toggleFly()
-        print("✈️ Fly: " .. (flyEnabled and "ATIVADO" or "DESATIVADO"))
-    end
-end)
-
--- Recriar sistemas quando o jogador respawn
-player.CharacterAdded:Connect(function(character)
-    print("👤 Character respawned...")
-    
-    local humanoid = character:WaitForChild("Humanoid")
-    originalWalkSpeed = humanoid.WalkSpeed
-    originalJumpPower = humanoid.JumpPower
-    
-    wait(2)
-    
-    if isGuiOpen then
-        createGui()
-        if gui and mainFrame then
-            mainFrame.Visible = true
-        end
-    end
-    
-    -- Reconfigurar sistemas ativos
-    if damageMultiplierEnabled then
-        setupDamageMultiplier()
-    end
-    
-    if speedEnabled then
-        updateSpeed()
-    end
-    
-    if noclipEnabled then
-        toggleNoclip()
-    end
-    
-    if espEnabled then
-        toggleESP()
-    end
-    
-    if aimAssistEnabled then
-        toggleAimAssist()
-    end
-    
-    if flyEnabled then
-        toggleFly()
-    end
-end)
-
--- Configuração inicial
-if player.Character then
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        originalWalkSpeed = humanoid.WalkSpeed
-        originalJumpPower = humanoid.JumpPower
-    end
-end
-
--- Sistema de pulo infinito global
-UserInputService.JumpRequest:Connect(function()
-    if infiniteJumpEnabled then
-        local character = player.Character
-        if character and character:FindFirstChildOfClass("Humanoid") then
-            character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end)
-
-wait(1)
-print("🚀 PAINEL DE HABILIDADES PRO CARREGADO!")
-print("📝 CONTROLES:")
-print("   G - Abrir/Fechar Painel")
-print("   N - Toggle Noclip")
-print("   J - Toggle Pulo Infinito") 
-print("   V - Toggle ESP")
-print("   B - Toggle Aim Assist")
-print("   H - Toggle Fly")
-print("   F - Teleporte (padrão)")
-
--- Criar GUI automaticamente
-spawn(function()
-    wait(2)
-    if not isGuiOpen then
-        toggleGui()
-    end
-end)
+    teleportStatus.Backgroun
