@@ -1,4 +1,4 @@
--- Painel de Habilidades para Roblox - VERSÃO COM COOLDOWN
+-- Painel de Habilidades para Roblox - VERSÃO COMPLETA COM COOLDOWN
 -- Coloque este script em StarterPlayer > StarterPlayerScripts
 -- Pressione G para abrir/fechar o painel
 
@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -43,10 +44,63 @@ local mainFrame = nil
 local noclipConnection = nil
 local flyConnection = nil
 local espBoxes = {}
-local hookedRemotes = {}
-local cooldownConnections = {}
 local flySpeed = 50
-local cooldownMultiplier = 0.5 -- 0.5 = metade do cooldown, 0.1 = 10% do cooldown original
+local cooldownMultiplier = 0.5
+local originalWait = wait
+local hookActive = false
+
+-- Sistema de hook do wait() melhorado
+local function setupCooldownHook()
+    if hookActive then return end
+    hookActive = true
+    
+    -- Hook global wait function
+    local env = getfenv()
+    if env then
+        env.wait = function(duration)
+            if duration and type(duration) == "number" and duration > 0 then
+                local modifiedDuration = duration * cooldownMultiplier
+                print("⏱️ Wait interceptado: " .. duration .. "s -> " .. modifiedDuration .. "s")
+                return originalWait(modifiedDuration)
+            else
+                return originalWait(duration)
+            end
+        end
+        print("✅ Hook do wait() ativo!")
+    end
+    
+    -- Hook task.wait também
+    local originalTaskWait = task.wait
+    task.wait = function(duration)
+        if duration and type(duration) == "number" and duration > 0 then
+            local modifiedDuration = duration * cooldownMultiplier
+            print("⏱️ Task.wait interceptado: " .. duration .. "s -> " .. modifiedDuration .. "s")
+            return originalTaskWait(modifiedDuration)
+        else
+            return originalTaskWait(duration)
+        end
+    end
+    
+    print("✅ Sistema de cooldown configurado!")
+end
+
+local function removeCooldownHook()
+    if not hookActive then return end
+    hookActive = false
+    
+    -- Restaurar wait original
+    local env = getfenv()
+    if env then
+        env.wait = originalWait
+    end
+    
+    -- Restaurar task.wait original
+    task.wait = function(duration)
+        return originalWait(duration)
+    end
+    
+    print("❌ Hook do cooldown removido!")
+end
 
 -- Função para criar efeito visual de teleporte
 local function createTeleportEffect(position)
@@ -64,7 +118,6 @@ local function createTeleportEffect(position)
     effect.CanCollide = false
     effect.Parent = workspace
     
-    -- Animação do efeito
     local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local tween = TweenService:Create(effect, tweenInfo, {
         Size = Vector3.new(10, 10, 10),
@@ -147,23 +200,7 @@ local function toggleNoclip()
     end
 end
 
--- Sistema de Pulo Infinito
-local function setupInfiniteJump()
-    if infiniteJumpEnabled then
-        UserInputService.JumpRequest:Connect(function()
-            local character = player.Character
-            if character and character:FindFirstChildOfClass("Humanoid") then
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end)
-        print("🦘 Pulo Infinito ATIVADO")
-    else
-        print("🚶 Pulo Infinito DESATIVADO")
-    end
-end
-
--- Sistema de ESP (visualizar jogadores através de paredes)
+-- Sistema de ESP
 local function createESP(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
         return
@@ -172,7 +209,6 @@ local function createESP(targetPlayer)
     local character = targetPlayer.Character
     local rootPart = character.HumanoidRootPart
     
-    -- Criar caixa de ESP
     local espBox = Instance.new("BoxHandleAdornment")
     espBox.Name = "ESPBox_" .. targetPlayer.Name
     espBox.Adornee = rootPart
@@ -183,7 +219,6 @@ local function createESP(targetPlayer)
     espBox.ZIndex = 10
     espBox.Parent = rootPart
     
-    -- Criar label com nome
     local espLabel = Instance.new("BillboardGui")
     espLabel.Name = "ESPLabel_" .. targetPlayer.Name
     espLabel.Adornee = rootPart
@@ -213,7 +248,6 @@ local function toggleESP()
             end
         end
         
-        -- Criar ESP para novos jogadores
         Players.PlayerAdded:Connect(function(newPlayer)
             if espEnabled then
                 newPlayer.CharacterAdded:Connect(function()
@@ -225,7 +259,6 @@ local function toggleESP()
         
         print("👁️ ESP ATIVADO")
     else
-        -- Remover todas as caixas ESP
         for targetPlayer, espElements in pairs(espBoxes) do
             for _, element in pairs(espElements) do
                 if element and element.Parent then
@@ -347,132 +380,6 @@ local function toggleAimAssist()
         end
         print("🎯 Aim Assist DESATIVADO")
     end
-end
-
--- Sistema de modificador de cooldown (NOVO)
-local originalCooldowns = {}
-
-local function setupCooldownModifier()
-    cooldownConnections = {}
-    hookedRemotes = {}
-    originalCooldowns = {}
-    
-    local character = player.Character
-    if not character then return end
-    
-    local function hookTool(tool)
-        if not tool:IsA("Tool") then return end
-        
-        -- Hook para LocalScripts que controlam cooldown
-        for _, descendant in pairs(tool:GetDescendants()) do
-            if descendant:IsA("LocalScript") then
-                local source = descendant.Source
-                if string.find(string.lower(source), "cooldown") or string.find(string.lower(source), "wait") then
-                    print("🕒 Detectado script com cooldown em: " .. tool.Name)
-                end
-            end
-            
-            -- Hook para RemoteEvents e RemoteFunctions
-            if descendant:IsA("RemoteEvent") then
-                if not hookedRemotes[descendant] then
-                    hookedRemotes[descendant] = descendant.FireServer
-                    
-                    descendant.FireServer = function(self, ...)
-                        local args = {...}
-                        
-                        -- Tentar interceptar argumentos de cooldown
-                        for i, arg in pairs(args) do
-                            if type(arg) == "number" and arg > 0.1 and arg < 60 then
-                                -- Provavelmente um tempo de cooldown
-                                local newCooldown = arg * cooldownMultiplier
-                                args[i] = newCooldown
-                                print("⏱️ Cooldown modificado: " .. arg .. "s -> " .. newCooldown .. "s")
-                                break
-                            end
-                        end
-                        
-                        return hookedRemotes[descendant](self, unpack(args))
-                    end
-                end
-            end
-        end
-        
-        -- Hook para NumberValues que podem representar cooldown
-        for _, descendant in pairs(tool:GetDescendants()) do
-            if descendant:IsA("NumberValue") and (string.find(string.lower(descendant.Name), "cooldown") or 
-                string.find(string.lower(descendant.Name), "delay") or string.find(string.lower(descendant.Name), "wait")) then
-                
-                if not originalCooldowns[descendant] then
-                    originalCooldowns[descendant] = descendant.Value
-                end
-                
-                descendant.Value = originalCooldowns[descendant] * cooldownMultiplier
-                print("🔧 Cooldown Value modificado: " .. descendant.Name .. " -> " .. descendant.Value)
-                
-                -- Monitorar mudanças
-                table.insert(cooldownConnections, descendant.Changed:Connect(function(newValue)
-                    if newValue ~= originalCooldowns[descendant] * cooldownMultiplier then
-                        wait(0.1)
-                        descendant.Value = originalCooldowns[descendant] * cooldownMultiplier
-                    end
-                end))
-            end
-        end
-    end
-    
-    -- Hook ferramentas existentes
-    for _, tool in pairs(character:GetChildren()) do
-        hookTool(tool)
-    end
-    
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, tool in pairs(backpack:GetChildren()) do
-            hookTool(tool)
-        end
-    end
-    
-    -- Hook futuras ferramentas
-    table.insert(cooldownConnections, character.ChildAdded:Connect(hookTool))
-    if backpack then
-        table.insert(cooldownConnections, backpack.ChildAdded:Connect(hookTool))
-    end
-    
-    -- Tentar modificar cooldowns globais conhecidos
-    local function modifyGlobalCooldowns()
-        local commonCooldownNames = {"Cooldown", "AttackCooldown", "SkillCooldown", "AbilityCooldown", "Delay"}
-        
-        for _, name in pairs(commonCooldownNames) do
-            local foundValues = {}
-            
-            -- Procurar em ReplicatedStorage
-            if game:GetService("ReplicatedStorage"):FindFirstChild(name, true) then
-                local value = game:GetService("ReplicatedStorage"):FindFirstChild(name, true)
-                if value:IsA("NumberValue") then
-                    table.insert(foundValues, value)
-                end
-            end
-            
-            -- Procurar em StarterGui
-            if game:GetService("StarterGui"):FindFirstChild(name, true) then
-                local value = game:GetService("StarterGui"):FindFirstChild(name, true)
-                if value:IsA("NumberValue") then
-                    table.insert(foundValues, value)
-                end
-            end
-            
-            for _, value in pairs(foundValues) do
-                if not originalCooldowns[value] then
-                    originalCooldowns[value] = value.Value
-                end
-                value.Value = originalCooldowns[value] * cooldownMultiplier
-                print("🌐 Cooldown global modificado: " .. value.Name)
-            end
-        end
-    end
-    
-    modifyGlobalCooldowns()
-    print("✅ Sistema de modificador de cooldown configurado!")
 end
 
 -- Funções para atualizar status visual
@@ -617,7 +524,7 @@ local function setupCustomKey(keyLabel)
     end)
 end
 
--- Função para criar a GUI (atualizada)
+-- Função para criar a GUI
 local function createGui()
     print("🎨 Criando interface expandida...")
     
@@ -643,7 +550,7 @@ local function createGui()
     mainFrame.Parent = gui
     mainFrame.Visible = true
     
-    -- ScrollingFrame para comportar todas as seções
+    -- ScrollingFrame
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Size = UDim2.new(1, 0, 1, -50)
     scrollFrame.Position = UDim2.new(0, 0, 0, 45)
@@ -673,7 +580,7 @@ local function createGui()
     titleCorner.CornerRadius = UDim.new(0, 15)
     titleCorner.Parent = title
     
-    -- Função helper para criar seções
+    -- Função para criar seções
     local function createSection(name, emoji, yPos, height)
         local section = Instance.new("Frame")
         section.Name = name .. "Section"
@@ -700,17 +607,17 @@ local function createGui()
         return section
     end
     
-    -- Criar todas as seções (substituindo dano por cooldown)
+    -- Criar seções
     local teleportSection = createSection("Teleporte", "🚀", 5, 160)
     local speedSection = createSection("Velocidade", "💨", 175, 140)
-    local noclipSection = createSection("Noclip", "👻", 325, 100)
-    local jumpSection = createSection("Pulo Infinito", "🦘", 435, 100)
-    local espSection = createSection("ESP", "👁️", 545, 100)
-    local aimSection = createSection("Aim Assist", "🎯", 655, 100)
-    local flySection = createSection("Fly", "✈️", 765, 140)
-    local cooldownSection = createSection("Modificador de Cooldown", "⏱️", 915, 140)
+    local cooldownSection = createSection("Modificador de Cooldown", "⏱️", 325, 140)
+    local noclipSection = createSection("Noclip", "👻", 475, 100)
+    local jumpSection = createSection("Pulo Infinito", "🦘", 585, 100)
+    local espSection = createSection("ESP", "👁️", 695, 100)
+    local aimSection = createSection("Aim Assist", "🎯", 805, 100)
+    local flySection = createSection("Fly", "✈️", 915, 140)
     
-    -- Configurar seção de teleporte
+    -- SEÇÃO TELEPORTE
     local teleportStatus = Instance.new("TextLabel")
     teleportStatus.Size = UDim2.new(1, -10, 0, 20)
     teleportStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -732,9 +639,9 @@ local function createGui()
     teleportToggle.Font = Enum.Font.GothamBold
     teleportToggle.Parent = teleportSection
     
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
-    toggleCorner.Parent = teleportToggle
+    local teleportCorner = Instance.new("UICorner")
+    teleportCorner.CornerRadius = UDim.new(0, 8)
+    teleportCorner.Parent = teleportToggle
     
     local teleportNow = Instance.new("TextButton")
     teleportNow.Size = UDim2.new(0.45, 0, 0, 35)
@@ -776,7 +683,7 @@ local function createGui()
     chooseCorner.CornerRadius = UDim.new(0, 8)
     chooseCorner.Parent = chooseKey
     
-    -- Configurar seção de velocidade
+    -- SEÇÃO VELOCIDADE
     local speedStatus = Instance.new("TextLabel")
     speedStatus.Size = UDim2.new(1, -10, 0, 20)
     speedStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -798,9 +705,9 @@ local function createGui()
     speedToggle.Font = Enum.Font.GothamBold
     speedToggle.Parent = speedSection
     
-    local speedToggleCorner = Instance.new("UICorner")
-    speedToggleCorner.CornerRadius = UDim.new(0, 8)
-    speedToggleCorner.Parent = speedToggle
+    local speedCorner = Instance.new("UICorner")
+    speedCorner.CornerRadius = UDim.new(0, 8)
+    speedCorner.Parent = speedToggle
     
     local speedBox = Instance.new("TextBox")
     speedBox.Size = UDim2.new(0.45, 0, 0, 35)
@@ -818,17 +725,69 @@ local function createGui()
     speedBoxCorner.CornerRadius = UDim.new(0, 8)
     speedBoxCorner.Parent = speedBox
     
-    local speedExplanation = Instance.new("TextLabel")
-    speedExplanation.Size = UDim2.new(1, -10, 0, 35)
-    speedExplanation.Position = UDim2.new(0, 5, 0, 95)
-    speedExplanation.BackgroundTransparency = 1
-    speedExplanation.Text = "Normal: 16 | Recomendado: 30-80"
-    speedExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    speedExplanation.TextScaled = true
-    speedExplanation.Font = Enum.Font.Gotham
-    speedExplanation.Parent = speedSection
+    local speedInfo = Instance.new("TextLabel")
+    speedInfo.Size = UDim2.new(1, -10, 0, 35)
+    speedInfo.Position = UDim2.new(0, 5, 0, 95)
+    speedInfo.BackgroundTransparency = 1
+    speedInfo.Text = "Normal: 16 | Recomendado: 30-80"
+    speedInfo.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    speedInfo.TextScaled = true
+    speedInfo.Font = Enum.Font.Gotham
+    speedInfo.Parent = speedSection
     
-    -- Configurar seção de noclip
+    -- SEÇÃO COOLDOWN
+    local cooldownStatus = Instance.new("TextLabel")
+    cooldownStatus.Size = UDim2.new(1, -10, 0, 20)
+    cooldownStatus.Position = UDim2.new(0, 5, 0, 30)
+    cooldownStatus.BackgroundTransparency = 1
+    cooldownStatus.Text = "STATUS: DESATIVADO"
+    cooldownStatus.TextColor3 = Color3.new(1, 0, 0)
+    cooldownStatus.TextScaled = true
+    cooldownStatus.Font = Enum.Font.Gotham
+    cooldownStatus.Parent = cooldownSection
+    
+    local cooldownToggle = Instance.new("TextButton")
+    cooldownToggle.Size = UDim2.new(0.45, 0, 0, 35)
+    cooldownToggle.Position = UDim2.new(0.05, 0, 0, 55)
+    cooldownToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    cooldownToggle.BorderSizePixel = 0
+    cooldownToggle.Text = "ATIVAR"
+    cooldownToggle.TextColor3 = Color3.new(1, 1, 1)
+    cooldownToggle.TextScaled = true
+    cooldownToggle.Font = Enum.Font.GothamBold
+    cooldownToggle.Parent = cooldownSection
+    
+    local cooldownCorner = Instance.new("UICorner")
+    cooldownCorner.CornerRadius = UDim.new(0, 8)
+    cooldownCorner.Parent = cooldownToggle
+    
+    local cooldownBox = Instance.new("TextBox")
+    cooldownBox.Size = UDim2.new(0.45, 0, 0, 35)
+    cooldownBox.Position = UDim2.new(0.5, 0, 0, 55)
+    cooldownBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    cooldownBox.BorderSizePixel = 0
+    cooldownBox.Text = "50"
+    cooldownBox.PlaceholderText = "Porcentagem"
+    cooldownBox.TextColor3 = Color3.new(1, 1, 1)
+    cooldownBox.TextScaled = true
+    cooldownBox.Font = Enum.Font.Gotham
+    cooldownBox.Parent = cooldownSection
+    
+    local cooldownBoxCorner = Instance.new("UICorner")
+    cooldownBoxCorner.CornerRadius = UDim.new(0, 8)
+    cooldownBoxCorner.Parent = cooldownBox
+    
+    local cooldownInfo = Instance.new("TextLabel")
+    cooldownInfo.Size = UDim2.new(1, -10, 0, 35)
+    cooldownInfo.Position = UDim2.new(0, 5, 0, 95)
+    cooldownInfo.BackgroundTransparency = 1
+    cooldownInfo.Text = "50% = metade do tempo | 10% = muito rápido"
+    cooldownInfo.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    cooldownInfo.TextScaled = true
+    cooldownInfo.Font = Enum.Font.Gotham
+    cooldownInfo.Parent = cooldownSection
+    
+    -- SEÇÃO NOCLIP
     local noclipStatus = Instance.new("TextLabel")
     noclipStatus.Size = UDim2.new(1, -10, 0, 20)
     noclipStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -854,7 +813,7 @@ local function createGui()
     noclipCorner.CornerRadius = UDim.new(0, 8)
     noclipCorner.Parent = noclipToggle
     
-    -- Configurar seção de pulo infinito
+    -- SEÇÃO PULO INFINITO
     local jumpStatus = Instance.new("TextLabel")
     jumpStatus.Size = UDim2.new(1, -10, 0, 20)
     jumpStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -880,7 +839,7 @@ local function createGui()
     jumpCorner.CornerRadius = UDim.new(0, 8)
     jumpCorner.Parent = jumpToggle
     
-    -- Configurar seção de ESP
+    -- SEÇÃO ESP
     local espStatus = Instance.new("TextLabel")
     espStatus.Size = UDim2.new(1, -10, 0, 20)
     espStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -906,7 +865,7 @@ local function createGui()
     espCorner.CornerRadius = UDim.new(0, 8)
     espCorner.Parent = espToggle
     
-    -- Configurar seção de aim assist
+    -- SEÇÃO AIM ASSIST
     local aimStatus = Instance.new("TextLabel")
     aimStatus.Size = UDim2.new(1, -10, 0, 20)
     aimStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -932,7 +891,7 @@ local function createGui()
     aimCorner.CornerRadius = UDim.new(0, 8)
     aimCorner.Parent = aimToggle
     
-    -- Configurar seção de fly
+    -- SEÇÃO FLY
     local flyStatus = Instance.new("TextLabel")
     flyStatus.Size = UDim2.new(1, -10, 0, 20)
     flyStatus.Position = UDim2.new(0, 5, 0, 30)
@@ -954,9 +913,9 @@ local function createGui()
     flyToggle.Font = Enum.Font.GothamBold
     flyToggle.Parent = flySection
     
-    local flyToggleCorner = Instance.new("UICorner")
-    flyToggleCorner.CornerRadius = UDim.new(0, 8)
-    flyToggleCorner.Parent = flyToggle
+    local flyCorner = Instance.new("UICorner")
+    flyCorner.CornerRadius = UDim.new(0, 8)
+    flyCorner.Parent = flyToggle
     
     local flyBox = Instance.new("TextBox")
     flyBox.Size = UDim2.new(0.45, 0, 0, 35)
@@ -974,69 +933,17 @@ local function createGui()
     flyBoxCorner.CornerRadius = UDim.new(0, 8)
     flyBoxCorner.Parent = flyBox
     
-    local flyExplanation = Instance.new("TextLabel")
-    flyExplanation.Size = UDim2.new(1, -10, 0, 35)
-    flyExplanation.Position = UDim2.new(0, 5, 0, 95)
-    flyExplanation.BackgroundTransparency = 1
-    flyExplanation.Text = "Use WASD + Space/Shift para voar"
-    flyExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    flyExplanation.TextScaled = true
-    flyExplanation.Font = Enum.Font.Gotham
-    flyExplanation.Parent = flySection
+    local flyInfo = Instance.new("TextLabel")
+    flyInfo.Size = UDim2.new(1, -10, 0, 35)
+    flyInfo.Position = UDim2.new(0, 5, 0, 95)
+    flyInfo.BackgroundTransparency = 1
+    flyInfo.Text = "Use WASD + Space/Shift para voar"
+    flyInfo.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    flyInfo.TextScaled = true
+    flyInfo.Font = Enum.Font.Gotham
+    flyInfo.Parent = flySection
     
-    -- Configurar seção de modificador de cooldown
-    local cooldownStatus = Instance.new("TextLabel")
-    cooldownStatus.Size = UDim2.new(1, -10, 0, 20)
-    cooldownStatus.Position = UDim2.new(0, 5, 0, 30)
-    cooldownStatus.BackgroundTransparency = 1
-    cooldownStatus.Text = "STATUS: DESATIVADO"
-    cooldownStatus.TextColor3 = Color3.new(1, 0, 0)
-    cooldownStatus.TextScaled = true
-    cooldownStatus.Font = Enum.Font.Gotham
-    cooldownStatus.Parent = cooldownSection
-    
-    local cooldownToggle = Instance.new("TextButton")
-    cooldownToggle.Size = UDim2.new(0.45, 0, 0, 35)
-    cooldownToggle.Position = UDim2.new(0.05, 0, 0, 55)
-    cooldownToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
-    cooldownToggle.BorderSizePixel = 0
-    cooldownToggle.Text = "ATIVAR"
-    cooldownToggle.TextColor3 = Color3.new(1, 1, 1)
-    cooldownToggle.TextScaled = true
-    cooldownToggle.Font = Enum.Font.GothamBold
-    cooldownToggle.Parent = cooldownSection
-    
-    local cooldownToggleCorner = Instance.new("UICorner")
-    cooldownToggleCorner.CornerRadius = UDim.new(0, 8)
-    cooldownToggleCorner.Parent = cooldownToggle
-    
-    local cooldownBox = Instance.new("TextBox")
-    cooldownBox.Size = UDim2.new(0.45, 0, 0, 35)
-    cooldownBox.Position = UDim2.new(0.5, 0, 0, 55)
-    cooldownBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    cooldownBox.BorderSizePixel = 0
-    cooldownBox.Text = "50"
-    cooldownBox.PlaceholderText = "Porcentagem"
-    cooldownBox.TextColor3 = Color3.new(1, 1, 1)
-    cooldownBox.TextScaled = true
-    cooldownBox.Font = Enum.Font.Gotham
-    cooldownBox.Parent = cooldownSection
-    
-    local cooldownBoxCorner = Instance.new("UICorner")
-    cooldownBoxCorner.CornerRadius = UDim.new(0, 8)
-    cooldownBoxCorner.Parent = cooldownBox
-    
-    local cooldownExplanation = Instance.new("TextLabel")
-    cooldownExplanation.Size = UDim2.new(1, -10, 0, 35)
-    cooldownExplanation.Position = UDim2.new(0, 5, 0, 95)
-    cooldownExplanation.BackgroundTransparency = 1
-    cooldownExplanation.Text = "50% = metade do tempo | 10% = muito rápido"
-    cooldownExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    cooldownExplanation.TextScaled = true
-    cooldownExplanation.Font = Enum.Font.Gotham
-    cooldownExplanation.Parent = cooldownSection
-    
-    -- Botão fechar
+    -- BOTÃO FECHAR
     local closeButton = Instance.new("TextButton")
     closeButton.Size = UDim2.new(0, 25, 0, 25)
     closeButton.Position = UDim2.new(1, -35, 0, 10)
@@ -1052,13 +959,15 @@ local function createGui()
     closeCorner.CornerRadius = UDim.new(0, 12)
     closeCorner.Parent = closeButton
     
-    print("🎛️ Interface completa criada!")
+    print("Interface completa criada!")
     
-    -- Eventos dos botões - TELEPORTE
+    -- EVENTOS DOS BOTÕES
+    
+    -- Teleporte
     teleportToggle.MouseButton1Click:Connect(function()
         teleportEnabled = not teleportEnabled
         updateTeleportStatus(teleportStatus, teleportToggle)
-        print("🚀 Teleporte: " .. (teleportEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Teleporte: " .. (teleportEnabled and "ATIVADO" or "DESATIVADO"))
     end)
     
     teleportNow.MouseButton1Click:Connect(function()
@@ -1069,12 +978,12 @@ local function createGui()
         setupCustomKey(keyLabel)
     end)
     
-    -- Eventos dos botões - VELOCIDADE
+    -- Velocidade
     speedToggle.MouseButton1Click:Connect(function()
         speedEnabled = not speedEnabled
         updateSpeedStatus(speedStatus, speedToggle)
         updateSpeed()
-        print("💨 Velocidade: " .. (speedEnabled and "ATIVADA" or "DESATIVADA"))
+        print("Velocidade: " .. (speedEnabled and "ATIVADA" or "DESATIVADA"))
     end)
     
     speedBox.FocusLost:Connect(function()
@@ -1090,35 +999,59 @@ local function createGui()
         end
     end)
     
-    -- Eventos dos botões - NOCLIP
+    -- Cooldown
+    cooldownToggle.MouseButton1Click:Connect(function()
+        cooldownModifierEnabled = not cooldownModifierEnabled
+        updateCooldownStatus(cooldownStatus, cooldownToggle)
+        
+        if cooldownModifierEnabled then
+            setupCooldownHook()
+        else
+            removeCooldownHook()
+        end
+        print("Cooldown Modifier: " .. (cooldownModifierEnabled and "ATIVADO" or "DESATIVADO"))
+    end)
+    
+    cooldownBox.FocusLost:Connect(function()
+        local value = tonumber(cooldownBox.Text)
+        if value and value > 0 and value <= 100 then
+            cooldownMultiplier = value / 100
+            updateCooldownStatus(cooldownStatus, cooldownToggle)
+            print("Cooldown definido para: " .. value .. "%")
+        else
+            cooldownBox.Text = tostring(math.floor(cooldownMultiplier * 100))
+        end
+    end)
+    
+    -- Noclip
     noclipToggle.MouseButton1Click:Connect(function()
         noclipEnabled = not noclipEnabled
         updateNoclipStatus(noclipStatus, noclipToggle)
         toggleNoclip()
     end)
     
-    -- Eventos dos botões - PULO INFINITO
+    -- Pulo Infinito
     jumpToggle.MouseButton1Click:Connect(function()
         infiniteJumpEnabled = not infiniteJumpEnabled
         updateJumpStatus(jumpStatus, jumpToggle)
-        setupInfiniteJump()
+        print("Pulo Infinito: " .. (infiniteJumpEnabled and "ATIVADO" or "DESATIVADO"))
     end)
     
-    -- Eventos dos botões - ESP
+    -- ESP
     espToggle.MouseButton1Click:Connect(function()
         espEnabled = not espEnabled
         updateESPStatus(espStatus, espToggle)
         toggleESP()
     end)
     
-    -- Eventos dos botões - AIM ASSIST
+    -- Aim Assist
     aimToggle.MouseButton1Click:Connect(function()
         aimAssistEnabled = not aimAssistEnabled
         updateAimStatus(aimStatus, aimToggle)
         toggleAimAssist()
     end)
     
-    -- Eventos dos botões - FLY
+    -- Fly
     flyToggle.MouseButton1Click:Connect(function()
         flyEnabled = not flyEnabled
         updateFlyStatus(flyStatus, flyToggle)
@@ -1135,72 +1068,22 @@ local function createGui()
         end
     end)
     
-    -- Eventos dos botões - MODIFICADOR DE COOLDOWN
-    cooldownToggle.MouseButton1Click:Connect(function()
-        cooldownModifierEnabled = not cooldownModifierEnabled
-        updateCooldownStatus(cooldownStatus, cooldownToggle)
-        
-        if cooldownModifierEnabled then
-            setupCooldownModifier()
-        else
-            -- Limpar conexões
-            for _, connection in pairs(cooldownConnections) do
-                if connection and connection.Disconnect then
-                    connection:Disconnect()
-                end
-            end
-            cooldownConnections = {}
-            
-            -- Restaurar RemoteEvents
-            for remote, originalFire in pairs(hookedRemotes) do
-                if remote and remote.Parent then
-                    remote.FireServer = originalFire
-                end
-            end
-            hookedRemotes = {}
-            
-            -- Restaurar NumberValues
-            for value, originalCooldown in pairs(originalCooldowns) do
-                if value and value.Parent then
-                    value.Value = originalCooldown
-                end
-            end
-            originalCooldowns = {}
-        end
-    end)
-    
-    cooldownBox.FocusLost:Connect(function()
-        local value = tonumber(cooldownBox.Text)
-        if value and value > 0 and value <= 100 then
-            cooldownMultiplier = value / 100
-            updateCooldownStatus(cooldownStatus, cooldownToggle)
-            if cooldownModifierEnabled then
-                -- Reconfigurar com novo multiplicador
-                cooldownModifierEnabled = false
-                cooldownModifierEnabled = true
-                setupCooldownModifier()
-            end
-        else
-            cooldownBox.Text = tostring(math.floor(cooldownMultiplier * 100))
-        end
-    end)
-    
-    -- Evento do botão fechar
+    -- Fechar
     closeButton.MouseButton1Click:Connect(function()
         toggleGui()
     end)
     
     -- Inicializar status
     updateTeleportStatus(teleportStatus, teleportToggle)
-    updateCooldownStatus(cooldownStatus, cooldownToggle)
     updateSpeedStatus(speedStatus, speedToggle)
+    updateCooldownStatus(cooldownStatus, cooldownToggle)
     updateNoclipStatus(noclipStatus, noclipToggle)
     updateJumpStatus(jumpStatus, jumpToggle)
     updateESPStatus(espStatus, espToggle)
     updateAimStatus(aimStatus, aimToggle)
     updateFlyStatus(flyStatus, flyToggle)
     
-    print("✅ Interface totalmente configurada!")
+    print("Interface totalmente configurada!")
     return mainFrame
 end
 
@@ -1210,7 +1093,7 @@ function toggleGui()
         local newMainFrame = createGui()
         isGuiOpen = true
         newMainFrame.Visible = true
-        print("✅ GUI criada e exibida!")
+        print("GUI criada e exibida!")
     else
         isGuiOpen = not isGuiOpen
         if mainFrame then
@@ -1219,7 +1102,7 @@ function toggleGui()
     end
 end
 
--- Input handling melhorado
+-- Sistema de input
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -1239,49 +1122,50 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
     
-    -- Teclas de atalho adicionais
+    -- Atalhos
     if input.KeyCode == Enum.KeyCode.N then
         noclipEnabled = not noclipEnabled
         toggleNoclip()
-        print("👻 Noclip: " .. (noclipEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Noclip: " .. (noclipEnabled and "ATIVADO" or "DESATIVADO"))
     end
     
     if input.KeyCode == Enum.KeyCode.J then
         infiniteJumpEnabled = not infiniteJumpEnabled
-        setupInfiniteJump()
-        print("🦘 Pulo Infinito: " .. (infiniteJumpEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Pulo Infinito: " .. (infiniteJumpEnabled and "ATIVADO" or "DESATIVADO"))
     end
     
     if input.KeyCode == Enum.KeyCode.V then
         espEnabled = not espEnabled
         toggleESP()
-        print("👁️ ESP: " .. (espEnabled and "ATIVADO" or "DESATIVADO"))
+        print("ESP: " .. (espEnabled and "ATIVADO" or "DESATIVADO"))
     end
     
     if input.KeyCode == Enum.KeyCode.B then
         aimAssistEnabled = not aimAssistEnabled
         toggleAimAssist()
-        print("🎯 Aim Assist: " .. (aimAssistEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Aim Assist: " .. (aimAssistEnabled and "ATIVADO" or "DESATIVADO"))
     end
     
     if input.KeyCode == Enum.KeyCode.H then
         flyEnabled = not flyEnabled
         toggleFly()
-        print("✈️ Fly: " .. (flyEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Fly: " .. (flyEnabled and "ATIVADO" or "DESATIVADO"))
     end
     
     if input.KeyCode == Enum.KeyCode.C then
         cooldownModifierEnabled = not cooldownModifierEnabled
         if cooldownModifierEnabled then
-            setupCooldownModifier()
+            setupCooldownHook()
+        else
+            removeCooldownHook()
         end
-        print("⏱️ Cooldown Modifier: " .. (cooldownModifierEnabled and "ATIVADO" or "DESATIVADO"))
+        print("Cooldown Modifier: " .. (cooldownModifierEnabled and "ATIVADO" or "DESATIVADO"))
     end
 end)
 
--- Recriar sistemas quando o jogador respawn
+-- Sistema de respawn
 player.CharacterAdded:Connect(function(character)
-    print("👤 Character respawned...")
+    print("Character respawned...")
     
     local humanoid = character:WaitForChild("Humanoid")
     originalWalkSpeed = humanoid.WalkSpeed
@@ -1298,7 +1182,7 @@ player.CharacterAdded:Connect(function(character)
     
     -- Reconfigurar sistemas ativos
     if cooldownModifierEnabled then
-        setupCooldownModifier()
+        setupCooldownHook()
     end
     
     if speedEnabled then
@@ -1342,8 +1226,8 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 wait(1)
-print("🚀 PAINEL DE HABILIDADES PRO CARREGADO!")
-print("📝 CONTROLES:")
+print("PAINEL DE HABILIDADES PRO CARREGADO!")
+print("CONTROLES:")
 print("   G - Abrir/Fechar Painel")
 print("   N - Toggle Noclip")
 print("   J - Toggle Pulo Infinito") 
