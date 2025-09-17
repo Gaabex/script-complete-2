@@ -714,4 +714,608 @@ local function createGui()
     local teleportStatus = Instance.new("TextLabel")
     teleportStatus.Size = UDim2.new(1, -10, 0, 20)
     teleportStatus.Position = UDim2.new(0, 5, 0, 30)
-    teleportStatus.Backgroun
+    teleportStatus.BackgroundTransparency = 1
+    teleportStatus.Text = "STATUS: DESATIVADO"
+    teleportStatus.TextColor3 = Color3.new(1, 0, 0)
+    teleportStatus.TextScaled = true
+    teleportStatus.Font = Enum.Font.Gotham
+    teleportStatus.Parent = teleportSection
+    
+    local teleportToggle = Instance.new("TextButton")
+    teleportToggle.Size = UDim2.new(0.45, 0, 0, 35)
+    teleportToggle.Position = UDim2.new(0.05, 0, 0, 55)
+    teleportToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    teleportToggle.BorderSizePixel = 0
+    teleportToggle.Text = "ATIVAR"
+    teleportToggle.TextColor3 = Color3.new(1, 1, 1)
+    teleportToggle.TextScaled = true
+    teleportToggle.Font = Enum.Font.GothamBold
+    teleportToggle.Parent = teleportSection
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = teleportToggle
+    
+    local teleportNow = Instance.new("TextButton")
+    teleportNow.Size = UDim2.new(0.45, 0, 0, 35)
+    teleportNow.Position = UDim2.new(0.5, 0, 0, 55)
+    teleportNow.BackgroundColor3 = Color3.new(0, 0.5, 0.8)
+    teleportNow.BorderSizePixel = 0
+    teleportNow.Text = "TELEPORTAR AGORA"
+    teleportNow.TextColor3 = Color3.new(1, 1, 1)
+    teleportNow.TextScaled = true
+    teleportNow.Font = Enum.Font.GothamBold
+    teleportNow.Parent = teleportSection
+    
+    local nowCorner = Instance.new("UICorner")
+    nowCorner.CornerRadius = UDim.new(0, 8)
+    nowCorner.Parent = teleportNow
+    
+    local keyLabel = Instance.new("TextLabel")
+    keyLabel.Size = UDim2.new(1, -10, 0, 20)
+    keyLabel.Position = UDim2.new(0, 5, 0, 95)
+    keyLabel.BackgroundTransparency = 1
+    keyLabel.Text = "TECLA: " .. teleportKey
+    keyLabel.TextColor3 = Color3.new(1, 1, 1)
+    keyLabel.TextScaled = true
+    keyLabel.Font = Enum.Font.Gotham
+    keyLabel.Parent = teleportSection
+    
+    local chooseKey = Instance.new("TextButton")
+    chooseKey.Size = UDim2.new(1, -10, 0, 30)
+    chooseKey.Position = UDim2.new(0, 5, 0, 120)
+    chooseKey.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    chooseKey.BorderSizePixel = 0
+    chooseKey.Text = "ESCOLHER NOVA TECLA"
+    chooseKey.TextColor3 = Color3.new(1, 1, 1)
+    chooseKey.TextScaled = true
+    chooseKey.Font = Enum.Font.Gotham
+    chooseKey.Parent = teleportSection
+    
+    local chooseCorner = Instance.new("UICorner")
+    chooseCorner.CornerRadius = UDim.new(0, 8)
+    chooseCorner.Parent = chooseKey
+    
+    -- Configurar seção de velocidade
+    local speedStatus = Instance.new("TextLabel")
+    speedStatus.Size = UDim2.new(1, -10, 0, 20)
+    speedStatus.Position = UDim2.new(0, 5, 0, 30)
+    speedStatus.BackgroundTransparency = 1
+    speedStatus.Text = "STATUS: DESATIVADO"
+    speedStatus.TextColor3 = Color3.new(1, 0, 0)
+    speedStatus.TextScaled = true
+    speedStatus.Font = Enum.Font.Gotham
+    speedStatus.Parent = speedSection
+    
+    local speedToggle = Instance.new("TextButton")
+    speedToggle.Size = UDim2.new(0.45, 0, 0, 35)
+    speedToggle.Position = UDim2.new(0.05, 0, 0, 55)
+    speedToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    speedToggle.BorderSizePixel = 0
+    speedToggle.Text = "ATIVAR"
+    speedToggle.TextColor3 = Color3.new(1, 1, 1)
+    speedToggle.TextScaled = true
+    speedToggle.Font = Enum.Font.GothamBold
+    speedToggle.Parent = speedSection
+    
+    local speedToggleCorner = Instance.new("UICorner")
+    speedToggleCorner.CornerRadius = UDim.new(0, 8)
+    speedToggleCorner.Parent = speedToggle
+    
+    local speedBox = Instance.new("TextBox")
+    speedBox.Size = UDim2.new(0.45, 0, 0, 35)
+    speedBox.Position = UDim2.new(0.5, 0, 0, 55)
+    speedBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    speedBox.BorderSizePixel = 0
+    speedBox.Text = "50"
+    speedBox.PlaceholderText = "Velocidade"
+    speedBox.TextColor3 = Color3.new(1, 1, 1)
+    speedBox.TextScaled = true
+    speedBox.Font = Enum.Font.Gotham
+    speedBox.Parent = speedSection
+    
+    local speedBoxCorner = Instance.new("UICorner")
+    speedBoxCorner.CornerRadius = UDim.new(0, 8)
+    speedBoxCorner.Parent = speedBox
+    
+    local speedExplanation = Instance.new("TextLabel")
+    speedExplanation.Size = UDim2.new(1, -10, 0, 35)
+    speedExplanation.Position = UDim2.new(0, 5, 0, 95)
+    speedExplanation.BackgroundTransparency = 1
+    speedExplanation.Text = "Normal: 16 | Recomendado: 30-80"
+    speedExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    speedExplanation.TextScaled = true
+    speedExplanation.Font = Enum.Font.Gotham
+    speedExplanation.Parent = speedSection
+    
+    -- Configurar seção de noclip
+    local noclipStatus = Instance.new("TextLabel")
+    noclipStatus.Size = UDim2.new(1, -10, 0, 20)
+    noclipStatus.Position = UDim2.new(0, 5, 0, 30)
+    noclipStatus.BackgroundTransparency = 1
+    noclipStatus.Text = "STATUS: DESATIVADO"
+    noclipStatus.TextColor3 = Color3.new(1, 0, 0)
+    noclipStatus.TextScaled = true
+    noclipStatus.Font = Enum.Font.Gotham
+    noclipStatus.Parent = noclipSection
+    
+    local noclipToggle = Instance.new("TextButton")
+    noclipToggle.Size = UDim2.new(0.8, 0, 0, 40)
+    noclipToggle.Position = UDim2.new(0.1, 0, 0, 50)
+    noclipToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    noclipToggle.BorderSizePixel = 0
+    noclipToggle.Text = "ATIVAR"
+    noclipToggle.TextColor3 = Color3.new(1, 1, 1)
+    noclipToggle.TextScaled = true
+    noclipToggle.Font = Enum.Font.GothamBold
+    noclipToggle.Parent = noclipSection
+    
+    local noclipCorner = Instance.new("UICorner")
+    noclipCorner.CornerRadius = UDim.new(0, 8)
+    noclipCorner.Parent = noclipToggle
+    
+    -- Configurar seção de pulo infinito
+    local jumpStatus = Instance.new("TextLabel")
+    jumpStatus.Size = UDim2.new(1, -10, 0, 20)
+    jumpStatus.Position = UDim2.new(0, 5, 0, 30)
+    jumpStatus.BackgroundTransparency = 1
+    jumpStatus.Text = "STATUS: DESATIVADO"
+    jumpStatus.TextColor3 = Color3.new(1, 0, 0)
+    jumpStatus.TextScaled = true
+    jumpStatus.Font = Enum.Font.Gotham
+    jumpStatus.Parent = jumpSection
+    
+    local jumpToggle = Instance.new("TextButton")
+    jumpToggle.Size = UDim2.new(0.8, 0, 0, 40)
+    jumpToggle.Position = UDim2.new(0.1, 0, 0, 50)
+    jumpToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    jumpToggle.BorderSizePixel = 0
+    jumpToggle.Text = "ATIVAR"
+    jumpToggle.TextColor3 = Color3.new(1, 1, 1)
+    jumpToggle.TextScaled = true
+    jumpToggle.Font = Enum.Font.GothamBold
+    jumpToggle.Parent = jumpSection
+    
+    local jumpCorner = Instance.new("UICorner")
+    jumpCorner.CornerRadius = UDim.new(0, 8)
+    jumpCorner.Parent = jumpToggle
+    
+    -- Configurar seção de ESP
+    local espStatus = Instance.new("TextLabel")
+    espStatus.Size = UDim2.new(1, -10, 0, 20)
+    espStatus.Position = UDim2.new(0, 5, 0, 30)
+    espStatus.BackgroundTransparency = 1
+    espStatus.Text = "STATUS: DESATIVADO"
+    espStatus.TextColor3 = Color3.new(1, 0, 0)
+    espStatus.TextScaled = true
+    espStatus.Font = Enum.Font.Gotham
+    espStatus.Parent = espSection
+    
+    local espToggle = Instance.new("TextButton")
+    espToggle.Size = UDim2.new(0.8, 0, 0, 40)
+    espToggle.Position = UDim2.new(0.1, 0, 0, 50)
+    espToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    espToggle.BorderSizePixel = 0
+    espToggle.Text = "ATIVAR"
+    espToggle.TextColor3 = Color3.new(1, 1, 1)
+    espToggle.TextScaled = true
+    espToggle.Font = Enum.Font.GothamBold
+    espToggle.Parent = espSection
+    
+    local espCorner = Instance.new("UICorner")
+    espCorner.CornerRadius = UDim.new(0, 8)
+    espCorner.Parent = espToggle
+    
+    -- Configurar seção de aim assist
+    local aimStatus = Instance.new("TextLabel")
+    aimStatus.Size = UDim2.new(1, -10, 0, 20)
+    aimStatus.Position = UDim2.new(0, 5, 0, 30)
+    aimStatus.BackgroundTransparency = 1
+    aimStatus.Text = "STATUS: DESATIVADO"
+    aimStatus.TextColor3 = Color3.new(1, 0, 0)
+    aimStatus.TextScaled = true
+    aimStatus.Font = Enum.Font.Gotham
+    aimStatus.Parent = aimSection
+    
+    local aimToggle = Instance.new("TextButton")
+    aimToggle.Size = UDim2.new(0.8, 0, 0, 40)
+    aimToggle.Position = UDim2.new(0.1, 0, 0, 50)
+    aimToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    aimToggle.BorderSizePixel = 0
+    aimToggle.Text = "ATIVAR"
+    aimToggle.TextColor3 = Color3.new(1, 1, 1)
+    aimToggle.TextScaled = true
+    aimToggle.Font = Enum.Font.GothamBold
+    aimToggle.Parent = aimSection
+    
+    local aimCorner = Instance.new("UICorner")
+    aimCorner.CornerRadius = UDim.new(0, 8)
+    aimCorner.Parent = aimToggle
+    
+    -- Configurar seção de fly
+    local flyStatus = Instance.new("TextLabel")
+    flyStatus.Size = UDim2.new(1, -10, 0, 20)
+    flyStatus.Position = UDim2.new(0, 5, 0, 30)
+    flyStatus.BackgroundTransparency = 1
+    flyStatus.Text = "STATUS: DESATIVADO"
+    flyStatus.TextColor3 = Color3.new(1, 0, 0)
+    flyStatus.TextScaled = true
+    flyStatus.Font = Enum.Font.Gotham
+    flyStatus.Parent = flySection
+    
+    local flyToggle = Instance.new("TextButton")
+    flyToggle.Size = UDim2.new(0.45, 0, 0, 35)
+    flyToggle.Position = UDim2.new(0.05, 0, 0, 55)
+    flyToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    flyToggle.BorderSizePixel = 0
+    flyToggle.Text = "ATIVAR"
+    flyToggle.TextColor3 = Color3.new(1, 1, 1)
+    flyToggle.TextScaled = true
+    flyToggle.Font = Enum.Font.GothamBold
+    flyToggle.Parent = flySection
+    
+    local flyToggleCorner = Instance.new("UICorner")
+    flyToggleCorner.CornerRadius = UDim.new(0, 8)
+    flyToggleCorner.Parent = flyToggle
+    
+    local flyBox = Instance.new("TextBox")
+    flyBox.Size = UDim2.new(0.45, 0, 0, 35)
+    flyBox.Position = UDim2.new(0.5, 0, 0, 55)
+    flyBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    flyBox.BorderSizePixel = 0
+    flyBox.Text = "50"
+    flyBox.PlaceholderText = "Velocidade"
+    flyBox.TextColor3 = Color3.new(1, 1, 1)
+    flyBox.TextScaled = true
+    flyBox.Font = Enum.Font.Gotham
+    flyBox.Parent = flySection
+    
+    local flyBoxCorner = Instance.new("UICorner")
+    flyBoxCorner.CornerRadius = UDim.new(0, 8)
+    flyBoxCorner.Parent = flyBox
+    
+    local flyExplanation = Instance.new("TextLabel")
+    flyExplanation.Size = UDim2.new(1, -10, 0, 35)
+    flyExplanation.Position = UDim2.new(0, 5, 0, 95)
+    flyExplanation.BackgroundTransparency = 1
+    flyExplanation.Text = "Use WASD + Space/Shift para voar"
+    flyExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    flyExplanation.TextScaled = true
+    flyExplanation.Font = Enum.Font.Gotham
+    flyExplanation.Parent = flySection
+    
+    -- Configurar seção de modificador de cooldown
+    local cooldownStatus = Instance.new("TextLabel")
+    cooldownStatus.Size = UDim2.new(1, -10, 0, 20)
+    cooldownStatus.Position = UDim2.new(0, 5, 0, 30)
+    cooldownStatus.BackgroundTransparency = 1
+    cooldownStatus.Text = "STATUS: DESATIVADO"
+    cooldownStatus.TextColor3 = Color3.new(1, 0, 0)
+    cooldownStatus.TextScaled = true
+    cooldownStatus.Font = Enum.Font.Gotham
+    cooldownStatus.Parent = cooldownSection
+    
+    local cooldownToggle = Instance.new("TextButton")
+    cooldownToggle.Size = UDim2.new(0.45, 0, 0, 35)
+    cooldownToggle.Position = UDim2.new(0.05, 0, 0, 55)
+    cooldownToggle.BackgroundColor3 = Color3.new(0.7, 0, 0)
+    cooldownToggle.BorderSizePixel = 0
+    cooldownToggle.Text = "ATIVAR"
+    cooldownToggle.TextColor3 = Color3.new(1, 1, 1)
+    cooldownToggle.TextScaled = true
+    cooldownToggle.Font = Enum.Font.GothamBold
+    cooldownToggle.Parent = cooldownSection
+    
+    local cooldownToggleCorner = Instance.new("UICorner")
+    cooldownToggleCorner.CornerRadius = UDim.new(0, 8)
+    cooldownToggleCorner.Parent = cooldownToggle
+    
+    local cooldownBox = Instance.new("TextBox")
+    cooldownBox.Size = UDim2.new(0.45, 0, 0, 35)
+    cooldownBox.Position = UDim2.new(0.5, 0, 0, 55)
+    cooldownBox.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    cooldownBox.BorderSizePixel = 0
+    cooldownBox.Text = "50"
+    cooldownBox.PlaceholderText = "Porcentagem"
+    cooldownBox.TextColor3 = Color3.new(1, 1, 1)
+    cooldownBox.TextScaled = true
+    cooldownBox.Font = Enum.Font.Gotham
+    cooldownBox.Parent = cooldownSection
+    
+    local cooldownBoxCorner = Instance.new("UICorner")
+    cooldownBoxCorner.CornerRadius = UDim.new(0, 8)
+    cooldownBoxCorner.Parent = cooldownBox
+    
+    local cooldownExplanation = Instance.new("TextLabel")
+    cooldownExplanation.Size = UDim2.new(1, -10, 0, 35)
+    cooldownExplanation.Position = UDim2.new(0, 5, 0, 95)
+    cooldownExplanation.BackgroundTransparency = 1
+    cooldownExplanation.Text = "50% = metade do tempo | 10% = muito rápido"
+    cooldownExplanation.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    cooldownExplanation.TextScaled = true
+    cooldownExplanation.Font = Enum.Font.Gotham
+    cooldownExplanation.Parent = cooldownSection
+    
+    -- Botão fechar
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 25, 0, 25)
+    closeButton.Position = UDim2.new(1, -35, 0, 10)
+    closeButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
+    closeButton.BorderSizePixel = 0
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.new(1, 1, 1)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = mainFrame
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 12)
+    closeCorner.Parent = closeButton
+    
+    print("🎛️ Interface completa criada!")
+    
+    -- Eventos dos botões - TELEPORTE
+    teleportToggle.MouseButton1Click:Connect(function()
+        teleportEnabled = not teleportEnabled
+        updateTeleportStatus(teleportStatus, teleportToggle)
+        print("🚀 Teleporte: " .. (teleportEnabled and "ATIVADO" or "DESATIVADO"))
+    end)
+    
+    teleportNow.MouseButton1Click:Connect(function()
+        teleportToMousePosition()
+    end)
+    
+    chooseKey.MouseButton1Click:Connect(function()
+        setupCustomKey(keyLabel)
+    end)
+    
+    -- Eventos dos botões - VELOCIDADE
+    speedToggle.MouseButton1Click:Connect(function()
+        speedEnabled = not speedEnabled
+        updateSpeedStatus(speedStatus, speedToggle)
+        updateSpeed()
+        print("💨 Velocidade: " .. (speedEnabled and "ATIVADA" or "DESATIVADA"))
+    end)
+    
+    speedBox.FocusLost:Connect(function()
+        local value = tonumber(speedBox.Text)
+        if value and value > 0 and value <= 500 then
+            currentSpeed = value
+            updateSpeedStatus(speedStatus, speedToggle)
+            if speedEnabled then
+                updateSpeed()
+            end
+        else
+            speedBox.Text = tostring(currentSpeed)
+        end
+    end)
+    
+    -- Eventos dos botões - NOCLIP
+    noclipToggle.MouseButton1Click:Connect(function()
+        noclipEnabled = not noclipEnabled
+        updateNoclipStatus(noclipStatus, noclipToggle)
+        toggleNoclip()
+    end)
+    
+    -- Eventos dos botões - PULO INFINITO
+    jumpToggle.MouseButton1Click:Connect(function()
+        infiniteJumpEnabled = not infiniteJumpEnabled
+        updateJumpStatus(jumpStatus, jumpToggle)
+        setupInfiniteJump()
+    end)
+    
+    -- Eventos dos botões - ESP
+    espToggle.MouseButton1Click:Connect(function()
+        espEnabled = not espEnabled
+        updateESPStatus(espStatus, espToggle)
+        toggleESP()
+    end)
+    
+    -- Eventos dos botões - AIM ASSIST
+    aimToggle.MouseButton1Click:Connect(function()
+        aimAssistEnabled = not aimAssistEnabled
+        updateAimStatus(aimStatus, aimToggle)
+        toggleAimAssist()
+    end)
+    
+    -- Eventos dos botões - FLY
+    flyToggle.MouseButton1Click:Connect(function()
+        flyEnabled = not flyEnabled
+        updateFlyStatus(flyStatus, flyToggle)
+        toggleFly()
+    end)
+    
+    flyBox.FocusLost:Connect(function()
+        local value = tonumber(flyBox.Text)
+        if value and value > 0 and value <= 200 then
+            flySpeed = value
+            updateFlyStatus(flyStatus, flyToggle)
+        else
+            flyBox.Text = tostring(flySpeed)
+        end
+    end)
+    
+    -- Eventos dos botões - MODIFICADOR DE COOLDOWN
+    cooldownToggle.MouseButton1Click:Connect(function()
+        cooldownModifierEnabled = not cooldownModifierEnabled
+        updateCooldownStatus(cooldownStatus, cooldownToggle)
+        
+        if cooldownModifierEnabled then
+            setupCooldownModifier()
+        else
+            -- Limpar conexões
+            for _, connection in pairs(cooldownConnections) do
+                if connection and connection.Disconnect then
+                    connection:Disconnect()
+                end
+            end
+            cooldownConnections = {}
+            
+            -- Restaurar RemoteEvents
+            for remote, originalFire in pairs(hookedRemotes) do
+                if remote and remote.Parent then
+                    remote.FireServer = originalFire
+                end
+            end
+            hookedRemotes = {}
+            
+            -- Restaurar NumberValues
+            for value, originalCooldown in pairs(originalCooldowns) do
+                if value and value.Parent then
+                    value.Value = originalCooldown
+                end
+            end
+            originalCooldowns = {}
+        end
+    end)
+    
+    cooldownBox.FocusLost:Connect(function()
+        local value = tonumber(cooldownBox.Text)
+        if value and value > 0 and value <= 100 then
+            cooldownMultiplier = value / 100
+            updateCooldownStatus(cooldownStatus, cooldownToggle)
+            if cooldownModifierEnabled then
+                -- Reconfigurar com novo multiplicador
+                cooldownModifierEnabled = false
+                cooldownModifierEnabled = true
+                setupCooldownModifier()
+            end
+        else
+            cooldownBox.Text = tostring(math.floor(cooldownMultiplier * 100))
+        end
+    end)
+    
+    -- Evento do botão fechar
+    closeButton.MouseButton1Click:Connect(function()
+        toggleGui()
+    end)
+    
+    -- Inicializar status
+    updateTeleportStatus(teleportStatus, teleportToggle)
+    updateCooldownStatus(cooldownStatus, cooldownToggle)
+    updateSpeedStatus(speedStatus, speedToggle)
+    updateNoclipStatus(noclipStatus, noclipToggle)
+    updateJumpStatus(jumpStatus, jumpToggle)
+    updateESPStatus(espStatus, espToggle)
+    updateAimStatus(aimStatus, aimToggle)
+    updateFlyStatus(flyStatus, flyToggle)
+    
+    print("✅ Interface totalmente configurada!")
+    return mainFrame
+end
+
+-- Função para abrir/fechar GUI
+function toggleGui()
+    if not gui or not gui.Parent then
+        local newMainFrame = createGui()
+        isGuiOpen = true
+        newMainFrame.Visible = true
+        print("✅ GUI criada e exibida!")
+    else
+        isGuiOpen = not isGuiOpen
+        if mainFrame then
+            mainFrame.Visible = isGuiOpen
+        end
+    end
+end
+
+-- Input handling melhorado
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Abrir/fechar painel com G
+    if input.KeyCode == Enum.KeyCode.G then
+        toggleGui()
+    end
+    
+    -- Teleporte com tecla customizada
+    if teleportEnabled then
+        if input.KeyCode.Name == teleportKey then
+            teleportToMousePosition()
+        elseif teleportKey == "MouseButton1" and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            teleportToMousePosition()
+        elseif teleportKey == "MouseButton2" and input.UserInputType == Enum.UserInputType.MouseButton2 then
+            teleportToMousePosition()
+        end
+    end
+    
+    -- Teclas de atalho adicionais
+    if input.KeyCode == Enum.KeyCode.N then
+        noclipEnabled = not noclipEnabled
+        toggleNoclip()
+        print("👻 Noclip: " .. (noclipEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+    
+    if input.KeyCode == Enum.KeyCode.J then
+        infiniteJumpEnabled = not infiniteJumpEnabled
+        setupInfiniteJump()
+        print("🦘 Pulo Infinito: " .. (infiniteJumpEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+    
+    if input.KeyCode == Enum.KeyCode.V then
+        espEnabled = not espEnabled
+        toggleESP()
+        print("👁️ ESP: " .. (espEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+    
+    if input.KeyCode == Enum.KeyCode.B then
+        aimAssistEnabled = not aimAssistEnabled
+        toggleAimAssist()
+        print("🎯 Aim Assist: " .. (aimAssistEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+    
+    if input.KeyCode == Enum.KeyCode.H then
+        flyEnabled = not flyEnabled
+        toggleFly()
+        print("✈️ Fly: " .. (flyEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+    
+    if input.KeyCode == Enum.KeyCode.C then
+        cooldownModifierEnabled = not cooldownModifierEnabled
+        if cooldownModifierEnabled then
+            setupCooldownModifier()
+        end
+        print("⏱️ Cooldown Modifier: " .. (cooldownModifierEnabled and "ATIVADO" or "DESATIVADO"))
+    end
+end)
+
+-- Recriar sistemas quando o jogador respawn
+player.CharacterAdded:Connect(function(character)
+    print("👤 Character respawned...")
+    
+    local humanoid = character:WaitForChild("Humanoid")
+    originalWalkSpeed = humanoid.WalkSpeed
+    originalJumpPower = humanoid.JumpPower
+    
+    wait(2)
+    
+    if isGuiOpen then
+        createGui()
+        if gui and mainFrame then
+            mainFrame.Visible = true
+        end
+    end
+    
+    -- Reconfigurar sistemas ativos
+    if cooldownModifierEnabled then
+        setupCooldownModifier()
+    end
+    
+    if speedEnabled then
+        updateSpeed()
+    end
+    
+    if noclipEnabled then
+        toggleNoclip()
+    end
+    
+    if espEnabled then
+        toggleESP()
+    end
+    
+    if aimAssistEnabled then
+        toggleAimAssist()
+    end
+    
+    if flyEnabled then
+        toggleFly()
